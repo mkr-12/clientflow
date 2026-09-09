@@ -150,3 +150,35 @@ export async function deleteProject(formData: FormData) {
   revalidatePath("/clients");
   redirect("/projects?status=deleted");
 }
+
+export async function updateProjectStatus(projectId: string, nextStatus: string) {
+  const id = z.string().uuid().safeParse(projectId);
+  const status = projectStatus.safeParse(nextStatus);
+
+  if (!id.success || !status.success) {
+    return { ok: false, error: "invalid" } as const;
+  }
+
+  const { supabase, organizationId } = await requireOrganization();
+  const { data, error } = await supabase
+    .from("projects")
+    .update({ status: status.data })
+    .eq("id", id.data)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .select("id,status")
+    .maybeSingle();
+
+  if (error || !data) {
+    console.error("update project status failed", { code: error?.code });
+    return { ok: false, error: "save-failed" } as const;
+  }
+
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${id.data}`);
+  revalidatePath("/projects/kanban");
+  revalidatePath("/dashboard");
+  revalidatePath("/clients");
+
+  return { ok: true, status: data.status } as const;
+}

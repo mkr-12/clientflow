@@ -13,6 +13,35 @@ const statusLabel: Record<string, string> = {
   lost: "失注",
 };
 
+function formatActivityContent(type: string, content: string) {
+  if (type === "status_changed") {
+    const match = content.match(
+      /^ステータスを ([a-z_]+) から ([a-z_]+) に変更$/,
+    );
+
+    if (match) {
+      const [, from, to] = match;
+      return `${statusLabel[from] ?? from} → ${statusLabel[to] ?? to}`;
+    }
+  }
+
+  return content;
+}
+
+function activityTypeLabel(type: string) {
+  if (type === "status_changed") return "ステータス変更";
+  return "活動";
+}
+
+function formatActivityDate(value: string) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 export default async function ProjectDetailPage({
   params,
   searchParams,
@@ -78,15 +107,44 @@ export default async function ProjectDetailPage({
             </div>
           )}
 
-          <h2 className="mt-8 font-semibold">活動履歴</h2>
-          <div className="mt-3 space-y-3">
+          <div className="mt-8 flex items-end justify-between gap-4">
+            <div>
+              <h2 className="font-semibold">活動履歴</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                新しい履歴から順に表示しています。
+              </p>
+            </div>
+            <span className="text-xs text-zinc-400">
+              {(activities ?? []).length}件
+            </span>
+          </div>
+
+          <div className="mt-4 space-y-2">
             {(activities ?? []).map((activity) => (
-              <div key={activity.id} className="rounded-xl bg-zinc-50 p-3 text-sm">
-                <p>{activity.content}</p>
-                <p className="mt-1 text-xs text-zinc-500">{new Date(activity.created_at).toLocaleString("ja-JP")}</p>
+              <div
+                key={activity.id}
+                className="relative rounded-xl border border-zinc-200 bg-zinc-50/70 px-4 py-3 pl-11"
+              >
+                <span className="absolute left-4 top-5 h-2.5 w-2.5 rounded-full bg-zinc-400" />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-zinc-600 ring-1 ring-zinc-200">
+                    {activityTypeLabel(activity.type)}
+                  </span>
+                  <time className="text-xs text-zinc-400">
+                    {formatActivityDate(activity.created_at)}
+                  </time>
+                </div>
+                <p className="mt-2 text-sm font-medium text-zinc-800">
+                  {formatActivityContent(activity.type, activity.content)}
+                </p>
               </div>
             ))}
-            {!activities?.length && <p className="rounded-xl bg-zinc-50 p-4 text-sm text-zinc-500">活動履歴はまだありません。</p>}
+
+            {!activities?.length && (
+              <p className="rounded-xl bg-zinc-50 p-4 text-sm text-zinc-500">
+                活動履歴はまだありません。
+              </p>
+            )}
           </div>
         </section>
 
