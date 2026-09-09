@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteProject, updateProject } from "../actions";
+import { createActivity, deleteProject, updateProject } from "../actions";
 import { requireOrganization } from "@/lib/auth";
 
 const statusLabel: Record<string, string> = {
@@ -29,8 +29,18 @@ function formatActivityContent(type: string, content: string) {
 }
 
 function activityTypeLabel(type: string) {
-  if (type === "status_changed") return "ステータス変更";
-  return "活動";
+  const labels: Record<string, string> = {
+    inquiry_received: "問い合わせ受付",
+    call: "電話",
+    meeting: "打ち合わせ",
+    email: "メール",
+    quote_sent: "見積送付",
+    status_changed: "ステータス変更",
+    note: "メモ",
+    other: "その他",
+  };
+
+  return labels[type] ?? "活動";
 }
 
 function formatActivityDate(value: string) {
@@ -84,12 +94,22 @@ export default async function ProjectDetailPage({
 
       {query.status && (
         <p className="mt-5 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
-          {query.status === "created" ? "案件を登録しました。" : "案件情報を更新しました。"}
+          {query.status === "created"
+            ? "案件を登録しました。"
+            : query.status === "activity-added"
+              ? "活動履歴を追加しました。"
+              : "案件情報を更新しました。"}
         </p>
       )}
       {query.error && (
         <p className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">
-          {query.error === "invalid-client" ? "選択した顧客を確認してください。" : "操作を完了できませんでした。"}
+          {query.error === "invalid-client"
+            ? "選択した顧客を確認してください。"
+            : query.error === "invalid-activity"
+              ? "活動の種類と内容を確認してください。"
+              : query.error === "activity-save-failed"
+                ? "活動履歴を保存できませんでした。"
+                : "操作を完了できませんでした。"}
         </p>
       )}
 
@@ -111,13 +131,60 @@ export default async function ProjectDetailPage({
             <div>
               <h2 className="font-semibold">活動履歴</h2>
               <p className="mt-1 text-xs text-zinc-500">
-                新しい履歴から順に表示しています。
+                電話・打ち合わせ・メール・メモなどを案件ごとに残せます。
               </p>
             </div>
             <span className="text-xs text-zinc-400">
               {(activities ?? []).length}件
             </span>
           </div>
+
+          <form
+            action={createActivity}
+            className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4"
+          >
+            <input type="hidden" name="projectId" value={project.id} />
+
+            <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+              <label className="block text-sm font-medium">
+                種類
+                <select
+                  name="type"
+                  defaultValue="note"
+                  required
+                  className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2"
+                >
+                  <option value="call">電話</option>
+                  <option value="meeting">打ち合わせ</option>
+                  <option value="email">メール</option>
+                  <option value="quote_sent">見積送付</option>
+                  <option value="note">メモ</option>
+                  <option value="other">その他</option>
+                </select>
+              </label>
+
+              <label className="block text-sm font-medium">
+                内容
+                <textarea
+                  name="content"
+                  required
+                  maxLength={5000}
+                  rows={3}
+                  placeholder="例：先方と要件を確認。次回までに見積を作成する。"
+                  className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2"
+                />
+              </label>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-zinc-500">
+                ステータス変更はKanban・案件編集時に自動記録されます。
+              </p>
+              <button className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white">
+                活動を追加
+              </button>
+            </div>
+          </form>
 
           <div className="mt-4 space-y-2">
             {(activities ?? []).map((activity) => (

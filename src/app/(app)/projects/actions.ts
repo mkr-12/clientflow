@@ -7,6 +7,12 @@ import { requireOrganization } from "@/lib/auth";
 
 const projectStatus = z.enum(["new", "hearing", "quoted", "won", "in_progress", "delivered", "lost"]);
 
+const manualActivitySchema = z.object({
+  projectId: z.string().uuid(),
+  type: z.enum(["call", "meeting", "email", "quote_sent", "note", "other"]),
+  content: z.string().trim().min(1).max(5000),
+});
+
 const projectSchema = z.object({
   clientId: z.string().uuid(),
   title: z.string().trim().min(1).max(160),
@@ -149,6 +155,53 @@ export async function deleteProject(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/clients");
   redirect("/projects?status=deleted");
+}
+
+
+export async function createActivity(formData: FormData) {
+  const parsed = manualActivitySchema.safeParse({
+    projectId: formData.get("projectId"),
+    type: formData.get("type"),
+    content: formData.get("content"),
+  });
+
+  if (!parsed.success) {
+    const projectId = z.string().uuid().safeParse(formData.get("projectId"));
+    if (projectId.success) {
+      redirect(`/projects/${projectId.data}?error=invalid-activity`);
+    }
+    redirect("/projects?error=invalid");
+  }
+
+  const { supabase, organizationId, userId } = await requireOrganization();
+
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", parsed.data.projectId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!project) {
+    redirect("/projects?error=invalid");
+  }
+
+  const { error } = await supabase.from("activities").insert({
+    organization_id: organizationId,
+    project_id: parsed.data.projectId,
+    type: parsed.data.type,
+    content: parsed.data.content,
+    user_id: userId,
+  });
+
+  if (error) {
+    console.error("create activity failed", { code: error.code });
+    redirect(`/projects/${parsed.data.projectId}?error=activity-save-failed`);
+  }
+
+  revalidatePath(`/projects/${parsed.data.projectId}`);
+  redirect(`/projects/${parsed.data.projectId}?status=activity-added`);
 }
 
 export async function updateProjectStatus(projectId: string, nextStatus: string) {
