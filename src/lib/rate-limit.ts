@@ -1,24 +1,65 @@
-type Entry = { count: number; resetAt: number };
+import "server-only";
 
-const store = new Map<string, Entry>();
-const WINDOW_MS = 10 * 60 * 1000;
-const LIMIT = 5;
+import { createHmac } from "node:crypto";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-/**
- * Best-effort development limiter only.
- * Serverless instances do not share memory, so production should replace this
- * with a durable provider (e.g. Cloudflare/Upstash) before public launch.
- */
-export function checkRateLimit(key: string) {
-  const now = Date.now();
-  const current = store.get(key);
+type RateLimitRpcResult = {
+  allowed?: unknown;
+  remaining?: unknown;
+  reset_at?: unknown;
+};
 
-  if (!current || current.resetAt <= now) {
-    store.set(key, { count: 1, resetAt: now + WINDOW_MS });
-    return { allowed: true };
+function hashRateLimitKey(key: string) {
+  const pepper = process.env.RATE_LIMIT_PEPPER;
+
+  if (!pepper) {
+    throw new Error("Rate limit pepper is not configured.");
   }
 
-  if (current.count >= LIMIT) return { allowed: false };
-  current.count += 1;
-  return { allowed: true };
+  return createHmac("sha256", pepper).update(key).digest("hex");
+}
+
+export async function checkRateLimit(key: string) {
+  const admin = createAdminClient();
+  const keyHash = hashRateLimitKey(key);
+
+  const { data, error } = await admin.rpc(
+    "consume_public_inquiry_rate_limit",
+    { p_key_hash: keyHash },
+  );
+
+  if (error) {
+    console.error("consume_public_inquiry_rate_limit failed", {
+      code: error.code,
+    });
+
+    return {
+      ok: false as const,
+      allowed: false as const,
+      remaining: null,
+      resetAt: null,
+    };
+  }
+
+  const result = data as RateLimitRpcResult | null;
+
+  if (!result || typeof result.allowed !== "boolean") {
+    console.error("consume_public_inquiry_rate_limit returned invalid data");
+
+    return {
+      ok: false as const,
+      allowed: false as const,
+      remaining: null,
+      resetAt: null,
+    };
+  }
+
+  return {
+    ok: true as const,
+    allowed: result.allowed,
+    remaining:
+      typeof result.remaining === "number" ? result.remaining : null,
+    resetAt:
+      typeof result.reset_at === "string" ? result.reset_at : null,
+  };
 }

@@ -22,7 +22,13 @@ export async function submitInquiry(formData: FormData) {
 
   const requestHeaders = await headers();
   const ip = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!checkRateLimit(ip).allowed) {
+  const rateLimit = await checkRateLimit(ip);
+
+  if (!rateLimit.ok) {
+    redirect("/contact?status=failed");
+  }
+
+  if (!rateLimit.allowed) {
     redirect("/contact?status=rate-limited");
   }
 
