@@ -6,6 +6,7 @@ const errorMessage: Record<string, string> = {
   "invalid-input": "メールアドレスとパスワードを入力してください。",
   "login-failed": "ログインできませんでした。入力内容を確認してください。",
   "no-organization": "利用可能なワークスペースがありません。",
+  "workspace-load-failed": "ワークスペース情報を読み込めませんでした。時間を空けて再度お試しください。",
   "demo-unavailable": "デモアカウントは現在利用できません。",
   "demo-login-failed": "デモアカウントへログインできませんでした。",
 };
@@ -19,7 +20,7 @@ export default async function LoginPage({
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
 
-  if (!error && data?.claims?.sub) redirect("/dashboard");
+  if (!params.error && !error && data?.claims?.sub) redirect("/dashboard");
 
   const message = params.error
     ? (errorMessage[params.error] ?? "ログインできませんでした。")

@@ -33,7 +33,10 @@ export async function submitInquiry(formData: FormData) {
   }
 
   const orgSlug = process.env.DEMO_ORGANIZATION_SLUG;
-  if (!orgSlug) throw new Error("Inquiry organization is not configured.");
+  if (!orgSlug) {
+    console.error("Inquiry organization is not configured.");
+    redirect("/contact?status=failed");
+  }
 
   const admin = createAdminClient();
   const { error } = await admin.rpc("submit_public_inquiry", {

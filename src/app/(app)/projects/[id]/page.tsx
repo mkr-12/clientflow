@@ -63,7 +63,11 @@ export default async function ProjectDetailPage({
   const query = await searchParams;
   const { supabase, organizationId } = await requireOrganization();
 
-  const [{ data: project }, { data: clients }, { data: activities }] = await Promise.all([
+  const [
+    { data: project, error: projectError },
+    { data: clients, error: clientsError },
+    { data: activities, error: activitiesError },
+  ] = await Promise.all([
     supabase
       .from("projects")
       .select("id,title,description,internal_note,amount,status,due_date,client_id,clients(company_name,contact_name,email)")
@@ -84,6 +88,19 @@ export default async function ProjectDetailPage({
       .eq("project_id", id)
       .order("created_at", { ascending: false }),
   ]);
+
+  if (projectError) {
+    return (
+      <div>
+        <Link href="/projects" className="text-sm text-zinc-500 hover:text-zinc-900">
+          ← 案件一覧へ
+        </Link>
+        <p className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+          案件情報を読み込めませんでした。時間を空けて再度お試しください。
+        </p>
+      </div>
+    );
+  }
 
   if (!project) notFound();
   const projectClient = Array.isArray(project.clients) ? project.clients[0] : project.clients;
@@ -187,6 +204,11 @@ export default async function ProjectDetailPage({
           </form>
 
           <div className="mt-4 space-y-2">
+            {activitiesError && (
+              <p className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
+                活動履歴を読み込めませんでした。時間を空けて再度お試しください。
+              </p>
+            )}
             {(activities ?? []).map((activity) => (
               <div
                 key={activity.id}
@@ -207,7 +229,7 @@ export default async function ProjectDetailPage({
               </div>
             ))}
 
-            {!activities?.length && (
+            {!activitiesError && !activities?.length && (
               <p className="rounded-xl bg-zinc-50 p-4 text-sm text-zinc-500">
                 活動履歴はまだありません。
               </p>
@@ -218,10 +240,15 @@ export default async function ProjectDetailPage({
         <aside className="space-y-4">
           <form action={updateProject} className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-6">
             <h2 className="font-semibold">案件情報を編集</h2>
+            {clientsError && (
+              <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                顧客候補を読み込めないため、現在は案件情報を更新できません。
+              </p>
+            )}
             <input type="hidden" name="id" value={project.id} />
 
             <label className="block text-sm font-medium">顧客
-              <select name="clientId" required defaultValue={project.client_id} className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2">
+              <select name="clientId" required disabled={Boolean(clientsError)} defaultValue={project.client_id} className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50">
                 {(clients ?? []).map((client) => (
                   <option key={client.id} value={client.id}>{client.company_name} / {client.contact_name}</option>
                 ))}
@@ -265,7 +292,7 @@ export default async function ProjectDetailPage({
               現在: {statusLabel[project.status] ?? project.status} / ¥{Number(project.amount ?? 0).toLocaleString("ja-JP")}
             </div>
 
-            <button className="w-full rounded-lg bg-zinc-900 px-4 py-2.5 font-semibold text-white">更新</button>
+            <button disabled={Boolean(clientsError)} className="w-full rounded-lg bg-zinc-900 px-4 py-2.5 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">更新</button>
           </form>
 
           <form action={deleteProject} className="rounded-2xl border border-red-200 bg-white p-6">

@@ -8,7 +8,7 @@ export default async function ClientsPage({
 }) {
   const params = await searchParams;
   const { supabase, organizationId } = await requireOrganization();
-  const { data: clients } = await supabase
+  const { data: clients, error: loadError } = await supabase
     .from("clients")
     .select("id,company_name,contact_name,email,phone,projects(id,deleted_at)")
     .eq("organization_id", organizationId)
@@ -34,6 +34,11 @@ export default async function ClientsPage({
       {params.error && (
         <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">操作を完了できませんでした。</p>
       )}
+      {loadError && (
+        <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+          顧客情報を読み込めませんでした。時間を空けて再度お試しください。
+        </p>
+      )}
 
       <div className="grid gap-3">
         {(clients ?? []).map((client) => {
@@ -54,7 +59,7 @@ export default async function ClientsPage({
           );
         })}
 
-        {!clients?.length && (
+        {!loadError && !clients?.length && (
           <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-8 text-center">
             <p className="text-sm text-zinc-500">顧客はまだ登録されていません。</p>
             <Link href="/clients/new" className="mt-4 inline-block text-sm font-semibold underline">最初の顧客を登録する</Link>

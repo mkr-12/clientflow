@@ -23,7 +23,11 @@ export async function requireOrganization() {
     .limit(1)
     .maybeSingle();
 
-  if (error || !membership) {
+  if (error) {
+    redirect("/login?error=workspace-load-failed");
+  }
+
+  if (!membership) {
     redirect("/login?error=no-organization");
   }
 

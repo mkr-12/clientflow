@@ -24,7 +24,10 @@ export default async function ClientDetailPage({
   const query = await searchParams;
   const { supabase, organizationId } = await requireOrganization();
 
-  const [{ data: client }, { data: projects }] = await Promise.all([
+  const [
+    { data: client, error: clientError },
+    { data: projects, error: projectsError },
+  ] = await Promise.all([
     supabase
       .from("clients")
       .select("id,company_name,contact_name,email,phone,created_at")
@@ -40,6 +43,19 @@ export default async function ClientDetailPage({
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
   ]);
+
+  if (clientError) {
+    return (
+      <div>
+        <Link href="/clients" className="text-sm text-zinc-500 hover:text-zinc-900">
+          ← 顧客一覧へ
+        </Link>
+        <p className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+          顧客情報を読み込めませんでした。時間を空けて再度お試しください。
+        </p>
+      </div>
+    );
+  }
 
   if (!client) notFound();
 
@@ -66,6 +82,11 @@ export default async function ClientDetailPage({
 
           <h2 className="mt-8 font-semibold">関連案件</h2>
           <div className="mt-3 space-y-3">
+            {projectsError && (
+              <p className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
+                関連案件を読み込めませんでした。時間を空けて再度お試しください。
+              </p>
+            )}
             {(projects ?? []).map((project) => (
               <Link key={project.id} href={`/projects/${project.id}`} className="grid gap-2 rounded-xl bg-zinc-50 p-4 hover:bg-zinc-100 sm:grid-cols-[1fr_120px_120px]">
                 <p className="font-medium">{project.title}</p>
@@ -73,7 +94,7 @@ export default async function ClientDetailPage({
                 <p className="text-sm font-medium">¥{Number(project.amount ?? 0).toLocaleString("ja-JP")}</p>
               </Link>
             ))}
-            {!projects?.length && (
+            {!projectsError && !projects?.length && (
               <p className="rounded-xl bg-zinc-50 p-4 text-sm text-zinc-500">この顧客の案件はまだありません。</p>
             )}
           </div>
@@ -102,7 +123,7 @@ export default async function ClientDetailPage({
             <input type="hidden" name="id" value={client.id} />
             <h2 className="font-semibold text-red-700">顧客を削除</h2>
             <p className="mt-2 text-xs text-zinc-500">データは論理削除されます。案件が残っている場合は削除できません。</p>
-            <button disabled={Boolean(projects?.length)} className="mt-4 w-full rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-40">削除</button>
+            <button disabled={Boolean(projectsError || projects?.length)} className="mt-4 w-full rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-40">削除</button>
           </form>
         </aside>
       </div>

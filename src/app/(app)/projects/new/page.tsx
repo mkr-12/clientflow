@@ -9,7 +9,7 @@ export default async function NewProjectPage({
 }) {
   const { error } = await searchParams;
   const { supabase, organizationId } = await requireOrganization();
-  const { data: clients } = await supabase
+  const { data: clients, error: clientsError } = await supabase
     .from("clients")
     .select("id,company_name,contact_name")
     .eq("organization_id", organizationId)
@@ -28,7 +28,11 @@ export default async function NewProjectPage({
         </p>
       )}
 
-      {!clients?.length ? (
+      {clientsError ? (
+        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+          顧客情報を読み込めませんでした。時間を空けて再度お試しください。
+        </div>
+      ) : !clients?.length ? (
         <div className="mt-6 rounded-2xl border border-dashed border-zinc-300 bg-white p-8 text-center">
           <p className="text-sm text-zinc-500">案件登録には顧客が1件以上必要です。</p>
           <Link href="/clients/new" className="mt-4 inline-block text-sm font-semibold underline">顧客を登録する</Link>
